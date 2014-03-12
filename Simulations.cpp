@@ -5,8 +5,8 @@
 
 // This simulation intend verify our analytical results by a Monte Carlo algorithm, refer to the paper (also in the github repository) for more information.
 // This piece of code is specifically aimed at testing the following formula (for 2 families):
-// \mathbb{E}\left[ \sum_{i=1}^2 \left. \dfrac{N_i(t)(N_i(t)-1)}{N_+(t)( N_+(t)-1 ) } \right\vert N_+(t) \right]
-// = \dfrac{r_1(r_2+1)+r_2(r_2+1)}{r_+ (r_+ +1 )}-\dfrac{2}{ (r_+ +1 )}  \dfrac{1}{N_+(t)-1}
+//  \mathbb{E}\left[ \left. \dfrac{N_i(t)(N_i(t)-1)}{N_+(t)( N_+(t)-1 ) } \right\vert N_+(t)=n_+ \right]
+//  =\dfrac{r_i(r_i+1)}{r_+ (r_+ +1)}- \dfrac{2 r_i (r_+ -r_{i})}{r_+ (r_+ +1)} \dfrac{1}{ n_+ -1  }
 
 
 #include <iostream>		// setbuf, NULL
@@ -34,14 +34,14 @@ int main() {
 	cout << "r1=" << r1 << endl;
 	cout << "r2=" << r2 << endl;
 
-	int number_of_steps=100;
+	int number_of_steps=10;
 	double output_array[number_of_steps][5];
 	for (int i=0; i<number_of_steps; i++)
 	{
 		output_array[i][0] = (i+1)*rplus;
 	}
 
-	int number_of_pop = 1000; // The number of populations we are computing
+	int number_of_pop = 100; // The number of populations we are computing
 
 	vector<double> relatedness_replicate( number_of_pop );
 	// The vector that will contain the estimated relatedness for each independent population
@@ -94,7 +94,7 @@ int main() {
 		output_array[i][2] = output_array[i][1]-stdev; // Upper bound for the 95% confidence interval
 		output_array[i][3] = output_array[i][1]+stdev; // Lower bound for the 95% confidence interval
 
-		output_array[i][4] = double ( r1*(r1+1)+r2*(r2+1) ) / double ( rplus*(rplus+1) ) - 2. /  double ( (rplus+1)*(nplus-1) );
+		output_array[i][4] = double ( r1*(r1+1)+r2*(r2+1) ) / double ( rplus*(rplus+1) ) - 2. * double ( r1*r2+r2*r1 ) /  double ( rplus*(rplus+1)*(nplus-1) );
 		// The relatedness given by analytic formula
 		cout << "ntotal=" << output_array[i][0] << endl;
 		cout << "relatedness=" << output_array[i][4] << endl;
