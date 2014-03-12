@@ -11,13 +11,18 @@
 
 #include <iostream>		// setbuf, NULL
 #include <cstdio>		// stdout
-#include <cstdlib>
+#include <cstdlib>      // standard library
 #include <ctime>	    // time as seed for pseudo-random number generator
 #include <vector> 		// vector
 #include <cmath> 		// sqrt, pow
 #include <numeric>		// inner_product, accumulate
+#include <fstream>		// ofstream
+#include <sstream>		// ostringstream
+#include <unistd.h>
 
 using namespace std;
+
+string IntToStr(int);
 
 int main() {
 
@@ -25,23 +30,21 @@ int main() {
 
 	int r1 = 50;  		// Initial size of family 1
 	int n1;				// Size of family 1
-	int r2 = 50; 		// Initial size of family 2
+	int r2 = 1000; 		// Initial size of family 2
 	int n2;				// Size of family 2
 	int rplus = r1+r2;  // Initial size of population
 	int nplus;			// Size of population
 	int random;
 	srand (time(NULL)); // random seed
-	cout << "r1=" << r1 << endl;
-	cout << "r2=" << r2 << endl;
 
-	int number_of_steps=10;
+	int number_of_steps=100; // The number of
 	double output_array[number_of_steps][5];
 	for (int i=0; i<number_of_steps; i++)
 	{
 		output_array[i][0] = (i+1)*rplus;
 	}
 
-	int number_of_pop = 100; // The number of populations we are computing
+	int number_of_pop = 1000; // The number of populations we are computing
 
 	vector<double> relatedness_replicate( number_of_pop );
 	// The vector that will contain the estimated relatedness for each independent population
@@ -51,6 +54,14 @@ int main() {
 	fill(n1_replicate, n1_replicate+number_of_pop, r1);
 	int n2_replicate[number_of_pop];
 	fill(n2_replicate, n2_replicate+number_of_pop, r2);
+
+	string file_name = "r1="+IntToStr(r1)+"_r2="+IntToStr(r2)+"_replicate="+IntToStr(number_of_pop)+".txt";
+	cout << file_name << endl;
+
+	chdir("/cygdrive/c/Users/Thibault/Desktop/ISEM_M1_Cpp_Simulations/simulated_data/relatedness_cond_populationsize_12_03");
+	ofstream myfile;
+	myfile.open( file_name.c_str() );
+	myfile << "//total_population estimated_relatedness lower_bound upper_bound relatedness" << endl;
 
 	double s1;
 	double stdev;
@@ -76,7 +87,7 @@ int main() {
 
 			n1_replicate[j] = n1;
 			n2_replicate[j] = n2;
-			relatedness_replicate[j] = double ( n1*(n1-1)+n2*(n2-1)  ) / double ( nplus*(nplus-1) ) ;
+			relatedness_replicate[j] = ( double (n1) * (n1-1) + double(n2)*(n2-1)  ) / ( double(nplus) *(nplus-1) ) ;
 			// Append the estimated relatedness to the vector
 		}
 
@@ -96,12 +107,17 @@ int main() {
 
 		output_array[i][4] = double ( r1*(r1+1)+r2*(r2+1) ) / double ( rplus*(rplus+1) ) - 2. * double ( r1*r2+r2*r1 ) /  double ( rplus*(rplus+1)*(nplus-1) );
 		// The relatedness given by analytic formula
-		cout << "ntotal=" << output_array[i][0] << endl;
-		cout << "relatedness=" << output_array[i][4] << endl;
-		cout << "estimated relatedness=" << output_array[i][1] << endl;
-		cout << "with confidence interval [" << output_array[i][2] << "," << output_array[i][3] << "]" << endl; // display results
-	}
+		myfile << output_array[i][0] << " " << output_array[i][1] << " " << output_array[i][2] << " " << output_array[i][3] << " " << output_array[i][4] << endl;
 
+	}
+	myfile.close();
+	cout << "work done captain" << endl;
     return 0;
 }
 
+string IntToStr( int integer)
+{
+ ostringstream mystring;
+ mystring << integer;
+ return mystring.str();
+}
