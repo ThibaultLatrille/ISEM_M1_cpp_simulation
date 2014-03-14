@@ -25,7 +25,7 @@ for i,files in enumerate(onlyfiles):
         for line in f:
             if not line[0:2]=="//" or line[0]=="#":
                 list_line=line.split(" ")
-                pop.append(int(list_line[0]))
+                pop.append(float(list_line[0]))
                 estimation.append(float(list_line[1]))
                 lower_bound.append(float(list_line[2]))
                 upperbound.append(float(list_line[3]))
