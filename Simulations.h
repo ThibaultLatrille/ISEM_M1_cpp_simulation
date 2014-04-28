@@ -14,5 +14,6 @@ string IntToStr(int);
 string DoubleToStr( double doublenumber);
 
 int conditional_expectation( void );
+int exponential_growth( void );
 
 #endif /* SIMULATIONS_H_ */

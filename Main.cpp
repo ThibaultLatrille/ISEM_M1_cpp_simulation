@@ -18,6 +18,7 @@
 #include <cstdlib>      // standard library
 #include <cmath> 		// sqrt, pow
 #include <random>
+#include <algorithm>
 #include <chrono>
 #include <fstream>		// ofstream
 #include <unistd.h>     // chdir
@@ -25,91 +26,122 @@
 
 int main() {
 
-	setbuf(stdout, NULL); // Specifically for eclipse IDE, don't buffer output
+	//setbuf(stdout, NULL);
+	// Specifically for eclipse IDE, don't buffer output
+
 	chdir("/cygdrive/c/Users/Thibault/Desktop/ISEM_M1_Cpp_Simulations/simulated_data/expectation_time_14_03");
-	const double rho=0.2;
-	double tmax=20.;
+	// set current  directory
+
+	//////////////////////////////////
+
+	const double lambda(0.005);
+	const double tau(0.2);
+
+	const int number_simulation=1;
+	const int number_nematode=2;
 	const int r=100;
 
-	unsigned seed = chrono::system_clock::now().time_since_epoch().count(); // The seed
-	mt19937 generator(seed); // The mersenne_twister generator
-	uniform_real_distribution<double> distribution(0.0,1.0); // Uniform [0,1] distribution
+	double runi;
 
-	const int number_of_pop = 1000;
-	// The number of populations we are computing, influence the range of the confidence interval
-	const int number_of_time_steps = 250;
-	// The number of time steps we are intersted in
+	double time_growth[number_nematode];
+	double family_size[number_nematode];
 
-	double processus[number_of_time_steps][number_of_pop];
-	// The array containing all trajectories at each time steps.
+	const bool stoch_time=true;
+	const bool stoch_growth=true;
 
-	double output_array[number_of_time_steps][5]; // The array containing all relevants informations
+	fill(family_size, family_size+number_nematode, double(r) );
 
-	for (int index_time=0; index_time<number_of_time_steps; index_time++) // Initialize time steps.
-	{
-		output_array[index_time][0]=index_time*tmax/(number_of_time_steps-1);
-	}
+	vector<double> vector_replicate( number_simulation );
 
-	for (int pop_index=0 ; pop_index<number_of_pop ; pop_index++ ) // For each independent simulation
-	{
-		int n=r;
-		double t=0.0;
-		double runi;
-		double T;
-		int index_time=0;
-		double time_step=output_array[index_time][0];
-		while (t<tmax) // Until tmax is not reached
-		{
-			runi = distribution(generator);
-			T = -log(runi)/(rho*n); // T is exponentialy distributed
-			t+=T;
-			while (t>time_step)  // Write 1/(population size-1) at each time step
-			{
-				processus[index_time][pop_index]=1.0/(double(n)-1);
-				index_time++;
-				if (index_time==number_of_time_steps)
-					break;
-				time_step=output_array[index_time][0];
+	////////////////////////////////////
+
+	//unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+	unsigned seed=123;
+	mt19937 generator(seed);
+	uniform_real_distribution<double> u_distribution(0.0,1.0);
+
+	negative_binomial_distribution<int> nb_distribution(10000,0.5);
+
+	cout << nb_distribution(generator) << endl;
+
+	for (int ith_simu=0; ith_simu<number_simulation; ith_simu++){
+
+		fill(family_size, family_size+number_nematode, double(r) );
+		time_growth[number_nematode-1]=0.0;
+
+		for (int ith_nematode=(number_nematode-1) ; ith_nematode>0 ; ith_nematode-- ){
+
+			if (stoch_time)
+				{
+				runi = u_distribution(generator);
+				time_growth[ith_nematode-1] = time_growth[ith_nematode]-log(runi)/(tau);
+				}
+				else time_growth[ith_nematode-1] = time_growth[ith_nematode]+1./(tau);
+		}
+
+		for (int ith_nematode=0 ; ith_nematode<number_nematode ; ith_nematode++ ){
+			if (stoch_growth){
+				double p=exp(-lambda*(time_growth[ith_nematode]));
+				negative_binomial_distribution<int> nb_distribution(family_size[ith_nematode],p);
+				family_size[ith_nematode]+=nb_distribution(generator);
 			}
-			n++;
+			else family_size[ith_nematode]=family_size[ith_nematode]*exp(lambda*time_growth[ith_nematode]);
 		}
+
+		double sum_r=0.;
+		double sum_rsquared=0.;
+
+		cout << "For the " << ith_simu << "th simulation:" << endl;
+		for (int ith_nematode=0 ; ith_nematode<number_nematode ; ith_nematode++ ){
+			cout << "for the " << ith_nematode << "th nematode, the size is " << family_size[ith_nematode] << " and growth time is" << time_growth[ith_nematode] <<endl;
+			sum_r+=family_size[ith_nematode];
+			sum_rsquared+=pow(family_size[ith_nematode],2);
+		}
+
+		vector_replicate[ith_simu]=sum_rsquared/pow(sum_r,2);
+
 	}
 
-	string file_name = "r="+IntToStr(r)+"_tmax="+IntToStr(tmax)+"_rho="+DoubleToStr(rho)+"_replicate="+IntToStr(number_of_pop)+".txt";
-	// The file name
-	cout << file_name << endl;
+	double s1;
+	double mean;
+	s1 = accumulate( vector_replicate.begin() , vector_replicate.end() , 0.0 );
+	mean = s1 / number_simulation;
 
-	ofstream myfile;
-	myfile.open( file_name.c_str() ); // Open the file
-	myfile << "//time estimation lower_bound upper_bound expectation" << endl;
-	// The first line of the file, the header
-
-	for (int index_time=0; index_time<number_of_time_steps; index_time++)
-	{
-		double s1=0.; // The sum of 1/(population size-1) size at each time step
-		for (int pop_index=0 ; pop_index<number_of_pop ; pop_index++ )
-		{
-			s1+=processus[index_time][pop_index];
-		}
-		output_array[index_time][1]=s1/number_of_pop;
-
-		double s2=0.; // The sum of square of 1/(population size-1) at each time step
-		for (int pop_index=0 ; pop_index<number_of_pop ; pop_index++ )
-		{
-			s2+=pow(processus[index_time][pop_index],2.0);
-		}
-
-		double stdev = 1.96*sqrt( (s2/number_of_pop-pow(output_array[index_time][1],2.0) ) / (number_of_pop-1) );
-		// The standard deviation of 1/(population size-1) at each time step
-
-		output_array[index_time][2] = output_array[index_time][1]-stdev; // Upper bound for the 95% confidence interval
-		output_array[index_time][3] = output_array[index_time][1]+stdev; // Lower bound for the 95% confidence interval
-
-		output_array[index_time][4]=exp(-rho*output_array[index_time][0])/(double (r)-1);
-		// The expected value of 1/(population size-1)
-		myfile << output_array[index_time][0] << " " << output_array[index_time][1] << " " << output_array[index_time][2] << " " << output_array[index_time][3] << " " << output_array[index_time][4] << endl;
+	double s2(0.0);
+	double stdev;
+	double upper_bound_stdev;
+	double lower_bound_stdev;
+	s2 = 0.0;
+	for ( vector<double>::iterator it = vector_replicate.begin(); it != vector_replicate.end(); it++ ){
+		s2+=pow(*it,2.0);
 	}
-	myfile.close();
-	cout << "work finish" <<endl;
+
+	stdev = 1.96*sqrt( (s2/number_simulation-pow( mean,2.) ) / (number_simulation-1) );
+	lower_bound_stdev=mean-stdev;
+	upper_bound_stdev=mean+stdev;
+	cout << "lower bound stdev = " << lower_bound_stdev <<endl;
+	cout << "mean = " << mean <<endl;
+	cout << "upper bound  stdev= " << upper_bound_stdev <<endl;
+
+	double p=0.025;
+	int rank=floor(p*number_simulation);
+	sort (vector_replicate.begin() , vector_replicate.end());
+	cout << "rank = " << rank <<endl;
+
+	double lower_bound(vector_replicate[rank]);
+	double upper_bound(vector_replicate[number_simulation-rank]);
+
+	cout << "lower bound = " << lower_bound <<endl;
+	cout << "mean = " << mean <<endl;
+	cout << "upper bound = " << upper_bound <<endl;
+	double approximat_relatedness;
+	double q=exp(lambda/tau);
+
+	cout << "q = " << q <<endl;
+
+	approximat_relatedness=(q-1)*(pow(q,number_nematode)+1)/((q+1)*(pow(q,number_nematode)-1));
+
+	cout << "approximat_relatedness = " << approximat_relatedness <<endl;
     return 0;
 }
+
