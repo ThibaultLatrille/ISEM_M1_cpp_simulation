@@ -11,9 +11,10 @@
 using namespace std;
 
 string IntToStr(int);
-string DoubleToStr( double doublenumber);
+string DoubleToStr( double);
 
 int conditional_expectation( void );
 int exponential_growth( void );
+int simulate_infection(bool,bool,int);
 
 #endif /* SIMULATIONS_H_ */

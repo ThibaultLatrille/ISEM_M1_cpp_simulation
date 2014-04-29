@@ -27,10 +27,7 @@
 #include <chrono>
 #include "Simulations.h"
 
-int exponential_growth( void )
-{
-	setbuf(stdout, NULL); // Specifically for eclipse IDE, don't buffer output
-	chdir("/cygdrive/c/Users/Thibault/Desktop/ISEM_M1_Cpp_Simulations/simulated_data/expectation_time_14_03");
+int exponential_growth( void ){
 	const double rho=0.2;
 	double tmax=20.;
 	const int r=100;
@@ -119,11 +116,7 @@ int exponential_growth( void )
 }
 
 
-int conditional_expectation( void )
-{
-	chdir("/cygdrive/c/Users/Thibault/Desktop/ISEM_M1_Cpp_Simulations/simulated_data/relatedness_cond_populationsize_13_03");
-	setbuf(stdout, NULL); // Specifically for eclipse IDE, don't buffer output
-
+int conditional_expectation( void ){
 	int r_list[9]={10,20,30,40,50,100,200,500,1000};
 
 	for (int r1_index=0; r1_index<9; r1_index++) // For every r1 in r_list
@@ -218,6 +211,136 @@ int conditional_expectation( void )
 		}
 	}
 	cout << "work done captain" << endl;
+    return 0;
+}
+
+int simulate_infection( bool stoch_time, bool stoch_growth, int number_nematode ) {
+
+	const int number_simulation=1000;
+	const int r=100;
+
+	double runi;
+
+	////////////////////////////////////
+    string file_name=IntToStr(number_nematode)+"nematodes_";
+
+    if (stoch_time) file_name += "randtime_";
+    else file_name += "dettime_";
+    if (stoch_growth) file_name += "randgrowth";
+    else file_name += "detgrowth";
+    file_name += ".txt";
+
+	cout << file_name << endl;
+
+	ofstream myfile;
+	myfile.open( file_name.c_str() ); // Open the file
+    myfile << "//tau lambda mean lower_bound upper_bound" << endl;
+			// The first line of the file, the header
+
+	//unsigned seed = chrono::system_clock::now().time_since_epoch().count();
+	unsigned seed=123456;
+	mt19937 generator(seed);
+	uniform_real_distribution<double> u_distrib(0.0,1.0);
+
+	const double lambda=0.01;
+	for (int tau_rank=0; tau_rank<1000; tau_rank++){
+        vector<double> vector_replicate;
+        vector<int> number_infecting;
+
+        double tau=pow(10,-2+double(tau_rank)*4/1000)*lambda;
+
+
+        for (int ith_simu=0; ith_simu<number_simulation; ith_simu++){
+
+            double interval_time=0;
+            double sum_lineage=double(r);
+            vector<double> family_size;
+            vector<double> time_growth;
+            time_growth.push_back(0.);
+
+            for (int ith_nematode=0 ; ith_nematode<(number_nematode-1) ; ith_nematode++ ){
+                if (stoch_time){
+                    runi = u_distrib(generator);
+                    interval_time = -log(runi)/(tau);
+                }
+                else interval_time = 1./(tau);
+
+                if ((sum_lineage*exp(lambda*interval_time)+r)<pow(10,9)){
+                    for ( vector<double>::iterator it = time_growth.begin(); it != time_growth.end(); it++ ){
+                        *it+=interval_time;
+                    }
+                    time_growth.push_back(0.);
+                    sum_lineage*=exp(lambda*interval_time);
+                    sum_lineage+=r;
+                }
+                else break;
+            }
+            interval_time=log(pow(10,9)/sum_lineage)/lambda;
+            for ( vector<double>::iterator it = time_growth.begin(); it != time_growth.end(); it++ ){
+                *it+=interval_time;
+            }
+            int infection=0;
+            for ( vector<double>::iterator it = time_growth.begin(); it != time_growth.end(); it++ ){
+                infection++;
+                if (stoch_growth){
+                    double p=exp(-(*it)*lambda);
+                    negative_binomial_distribution<unsigned long long> nb_distrib(r,p);
+                    family_size.push_back(r+double(nb_distrib(generator)));
+                }
+                else family_size.push_back(r*exp((*it)*lambda));
+            }
+            double sum_r=0.;
+            double sum_rsquared=0.;
+
+            for ( vector<double>::iterator it = family_size.begin(); it != family_size.end(); it++ ){
+                sum_r+=(*it);
+                sum_rsquared+=pow(*it,2);
+            }
+
+            number_infecting.push_back(infection);
+            vector_replicate.push_back(sum_rsquared/pow(sum_r,2));
+        }
+
+        double s1_infection;
+        s1_infection = accumulate( number_infecting.begin() , number_infecting.end() , 0.0 );
+        double mean_infection = s1_infection / number_simulation;
+
+        double s1;
+        double mean;
+        s1 = accumulate( vector_replicate.begin() , vector_replicate.end() , 0.0 );
+        mean = s1 / number_simulation;
+
+        double s2(0.0);
+        double stdev;
+        double upper_bound_stdev;
+        double lower_bound_stdev;
+        s2 = 0.0;
+        for ( vector<double>::iterator it = vector_replicate.begin(); it != vector_replicate.end(); it++ ){
+            s2+=pow(*it,2.0);
+        }
+
+        stdev = 1.96*sqrt( (s2/number_simulation-pow( mean,2.) ) / (number_simulation-1) );
+        lower_bound_stdev=mean-stdev;
+        upper_bound_stdev=mean+stdev;
+
+        //double p=0.025;
+        //int rank=floor(p*number_simulation);
+        //sort (vector_replicate.begin() , vector_replicate.end());
+
+        //double lower_bound(vector_replicate[rank]);
+        //double upper_bound(vector_replicate[number_simulation-rank]);
+
+        //double approximat_relatedness;
+        //double q=exp(lambda/tau);
+
+        //approximat_relatedness=(q-1)*(pow(q,number_nematode)+1)/((q+1)*(pow(q,number_nematode)-1));
+
+        if (tau_rank*100%1000==0){
+        cout << tau_rank*100/1000 << "% done" << endl;
+        }
+        myfile << tau/lambda << " " << mean_infection << " " << mean << " " << lower_bound_stdev << " " << upper_bound_stdev << endl;
+	}
+	myfile.close(); // Write the file
     return 0;
 }
 
